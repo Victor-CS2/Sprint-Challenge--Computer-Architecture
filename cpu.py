@@ -21,7 +21,11 @@ class CPU:
                         'POP': 0b01000110,
                         'CALL': 0b01010000,
                         'RET': 0b00010001,
-                        'ADD': 0b10100000}
+                        'ADD': 0b10100000,
+                        'CMP': 0b10100111,
+                        'JEQ': 0b01010101,
+                        'JMP': 0b01010100, }
+        self.flag = 0b00000000  # changes based on the operands given to the CMP opcode
 
     def load(self, file_name):
         """Load a program into memory."""
@@ -66,6 +70,25 @@ class CPU:
         elif op == self.opcodes['MUL']:  # MUL
             self.register[reg_a] *= self.register[reg_b]
             self.pc += 3
+
+        elif op == self.opcodes['CMP']:  # CMP
+            # E flag is the 1st one from the right
+            # L flag is the 3rd one from the right
+            # G flag is the 2nd one from the right
+
+            # if the register a and register b are equal, set E flag to 1
+            if self.register[reg_a] == self.register[reg_b]:
+                self.flag = 0b00000001
+
+            # if the register a is less than register b, set L flag to 1
+            if self.register[reg_a] < self.register[reg_b]:
+                self.flag = 0b00000100
+
+            # if the register a is greater than register b, set G flag to 1
+            if self.register[reg_a] > self.register[reg_b]:
+                self.flag = 0b00000010
+
+            # else we just keep the flag set as 00000000
 
         else:
             raise Exception("Unsupported ALU operation")
