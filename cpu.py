@@ -12,19 +12,22 @@ class CPU:
         self.pc = 0  # program counter
         self.IR = 0  # Instruction Register, contains a copy of the currently executing instruction
         self.ram = [0] * 256
-        self.SP = 7
-        self.opcodes = {'LDI': 0b10000010,
-                        'PRN': 0b01000111,
-                        'HLT': 0b00000001,
-                        'MUL': 0b10100010,
-                        'PUSH': 0b01000101,
-                        'POP': 0b01000110,
-                        'CALL': 0b01010000,
-                        'RET': 0b00010001,
-                        'ADD': 0b10100000,
-                        'CMP': 0b10100111,
-                        'JEQ': 0b01010101,
-                        'JMP': 0b01010100, }
+        self.SP = 7  # stack pointers
+        self.opcodes = {
+            'LDI': 0b10000010,
+            'PRN': 0b01000111,
+            'HLT': 0b00000001,
+            'MUL': 0b10100010,
+            'PUSH': 0b01000101,
+            'POP': 0b01000110,
+            'CALL': 0b01010000,
+            'RET': 0b00010001,
+            'ADD': 0b10100000,
+            'CMP': 0b10100111,
+            'JMP': 0b01010100,
+            'JEQ': 0b01010101,
+            'JNE': 0b01010110, }
+
         self.flag = 0b00000000  # changes based on the operands given to the CMP opcode
 
     def load(self, file_name):
@@ -35,24 +38,23 @@ class CPU:
         program = []
 
         if file_name is None:
-            print("This file is bad.")  # for stretch
+            print("This file is bad.")
             sys.exit(1)
         try:
             with open(file_name, 'r') as f:
                 print("Inside the file")
                 for line in f:
-                    # Process comments:
-                    # Ignore anything after a # symbol
                     comment_split = line.split("#")
-                    # Convert any numbers from binary strings to integers
                     num = comment_split[0]
+
                     try:
                         x = int(num, 2)
                     except ValueError:
                         continue
-                    # print in binary and decimal
+
                     print(f"binary: {x:08b} Decimal: {x:d}")
                     program.append(x)
+
         except ValueError:
             print(f"File not found")
 
@@ -81,11 +83,11 @@ class CPU:
                 self.flag = 0b00000001
 
             # if the register a is less than register b, set L flag to 1
-            if self.register[reg_a] < self.register[reg_b]:
+            elif self.register[reg_a] < self.register[reg_b]:
                 self.flag = 0b00000100
 
             # if the register a is greater than register b, set G flag to 1
-            if self.register[reg_a] > self.register[reg_b]:
+            elif self.register[reg_a] > self.register[reg_b]:
                 self.flag = 0b00000010
 
             # else we just keep the flag set as 00000000
@@ -114,11 +116,11 @@ class CPU:
         print()
 
     def run(self):
-        """Run the CPU."""
         running = True
 
         while running:
 
+            # Instruction register, ccontains a copy of the currently executing instruction
             IR = self.ram[self.pc]
 
             if IR == self.opcodes['LDI']:  # LDI
@@ -136,6 +138,15 @@ class CPU:
             elif IR == self.opcodes['HLT']:  # HLT
                 running = False
                 self.pc += 1
+
+            elif IR == self.opcodes['CALL']:
+                # we want to push the return address on the stack
+                self.register[self.SP] -= 1  # the stack push
+                self.ram[self.register[self.SP]] = self.pc + 2
+                # The program counter is set to the address stored in the given register
+                reg = self.ram[self.pc + 1]
+                # We then jump to that location in the RAM and execute the first instruction
+                self.pc = self.register[reg]
 
             elif IR == self.opcodes['PUSH']:
                 reg = self.ram[self.pc + 1]
@@ -155,11 +166,6 @@ class CPU:
                 self.register[self.SP] += 1
                 self.pc += 2
 
-            elif IR == self.opcodes['CALL']:
-                # we want to push the return address on the stack
-                self.register[self.SP] -= 1  # the stack push
-                self.ram[self.register[self.SP]] = self.pc + 2
-
                 # The program counter is set to the address stored in the given register
                 reg = self.ram[self.pc + 1]
                 # We then jump to that location in the RAM and execute the first instruction
@@ -175,6 +181,41 @@ class CPU:
                 reg_a = self.ram[self.pc + 1]
                 reg_b = self.ram[self.pc + 2]
                 self.alu(IR, reg_a, reg_b)
+
+            elif IR == self.opcodes['MUL']:
+                reg_a = self.ram[self.pc + 1]
+                reg_b = self.ram[self.pc + 2]
+                self.alu(IR, reg_a, reg_b)
+
+            elif IR == self.opcodes['CMP']:
+                num = self.ram[self.pc + 1]
+                reg = self.ram[self.pc + 2]
+                self.alu(IR, num, reg)
+                self.pc += 3
+
+            elif IR == self.opcodes['JMP']:
+                # Jumps to the address stored in the given register
+                op_a = self.ram[self.pc + 1]
+
+                # Set the program count to the address stored in the given register
+                self.pc = self.register[op_a]
+
+            elif IR == self.opcodes['JEQ']:
+                op_a = self.ram[self.pc + 1]
+
+                if self.flag == 0b00000001:  # set the program count to the address stored in the given register if E flag is true
+                    self.pc = self.register[op_a]
+                else:
+                    # we need this program count if the E flag isn't true.
+                    self.pc += 2
+
+            elif IR == self.opcodes['JNE']:
+                op_a = self.ram[self.pc + 1]
+
+                if ((self.flag == 0b00000001) == 0):  # if the e flag is 1 (true), set it to 0
+                    self.pc = self.register[op_a]
+                else:
+                    self.pc += 2
 
             else:
                 print(f"Unknown IR: {IR}")
